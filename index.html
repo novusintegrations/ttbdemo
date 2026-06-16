@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TTB Label Verifier</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#f5f4f0; --surface:#ffffff; --border:#e2e0d8; --border-mid:#c8c5bb;
+    --text:#1a1917; --text-2:#5c5a54; --text-3:#9a9890;
+    --green:#1a6b3c; --green-bg:#eaf5ee;
+    --red:#b53a2a; --red-bg:#fdf0ee;
+    --amber:#8a5d0a; --amber-bg:#fdf5e6;
+    --blue:#1a4e8a; --blue-bg:#eaf0fb;
+    --purple:#5b2d8a; --purple-bg:#f2edfb;
+    --radius:8px; --radius-lg:12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#111110; --surface:#1c1b19; --border:#2e2d29; --border-mid:#3d3c37;
+      --text:#f0ede6; --text-2:#a09d95; --text-3:#5c5a54;
+      --green:#4caf72; --green-bg:#0d2618;
+      --red:#e07060; --red-bg:#2a1210;
+      --amber:#e0a84a; --amber-bg:#241a08;
+      --blue:#6b9fe0; --blue-bg:#0e1e36;
+      --purple:#b088e8; --purple-bg:#1e1030;
+    }
+  }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); font-size:14px; line-height:1.6; min-height:100vh; }
+  /* topbar */
+  .topbar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 20px; height:52px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; gap:12px; }
+  .topbar-left { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .logo-mark { width:28px; height:28px; background:var(--text); border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .logo-mark svg { width:16px; height:16px; fill:var(--surface); }
+  .topbar h1 { font-size:14px; font-weight:600; letter-spacing:-0.01em; }
+  .topbar-sub { font-size:12px; color:var(--text-3); }
+  .topbar-right { display:flex; align-items:center; gap:8px; }
+  .nav-btn { height:30px; padding:0 12px; border-radius:var(--radius); font-size:12px; font-weight:500; cursor:pointer; border:1px solid var(--border); background:transparent; color:var(--text-2); font-family:inherit; transition:background 0.1s; white-space:nowrap; }
+  .nav-btn:hover { background:var(--bg); }
+  .nav-btn.active { background:var(--blue-bg); color:var(--blue); border-color:var(--blue); }
+  .key-field { display:flex; align-items:center; gap:6px; }
+  .key-field label { font-size:12px; color:var(--text-3); white-space:nowrap; }
+  .key-field input { width:210px; height:30px; padding:0 10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg); color:var(--text); font-size:12px; font-family:'SF Mono','Fira Code',monospace; }
+  .key-field input:focus { outline:none; border-color:var(--border-mid); }
+  @media (max-width:740px) { .topbar-sub { display:none; } .key-field input { width:150px; } }
+  /* layout */
+  .main { max-width:1060px; margin:0 auto; padding:24px 16px 80px; }
+  .page { display:none; }
+  .page.active { display:block; }
+  .pane-grid { display:grid; grid-template-columns:360px 1fr; gap:18px; align-items:start; }
+  @media (max-width:740px) { .pane-grid { grid-template-columns:1fr; } }
+  /* cards */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; }
+  .card-head { padding:11px 16px; border-bottom:1px solid var(--border); font-size:11px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-3); display:flex; align-items:center; justify-content:space-between; }
+  .card-body { padding:16px; }
+  /* drop zone */
+  .drop-zone { border:1.5px dashed var(--border-mid); border-radius:var(--radius); min-height:150px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; cursor:pointer; transition:background 0.12s,border-color 0.12s; text-align:center; padding:20px 14px; }
+  .drop-zone:hover,.drop-zone.over { background:var(--bg); border-color:var(--text-2); }
+  .drop-zone svg { width:28px; height:28px; stroke:var(--text-3); }
+  .drop-zone p { font-size:13px; color:var(--text-2); }
+  .drop-zone small { font-size:11px; color:var(--text-3); }
+  .preview-wrap { position:relative; }
+  .preview-img { width:100%; max-height:260px; object-fit:contain; border-radius:var(--radius); border:1px solid var(--border); display:block; }
+  .preview-change { position:absolute; top:8px; right:8px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:4px 10px; font-size:12px; cursor:pointer; color:var(--text-2); }
+  .preview-change:hover { background:var(--bg); }
+  /* batch */
+  .batch-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--border); font-size:12px; color:var(--text-2); }
+  .batch-row:last-child { border-bottom:none; }
+  .batch-row span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* form */
+  .form-row { margin-bottom:10px; }
+  .form-row label { display:block; font-size:11px; font-weight:500; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px; }
+  .form-row input,.form-row textarea,.form-row select { width:100%; padding:7px 10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg); color:var(--text); font-size:13px; font-family:inherit; }
+  .form-row input:focus,.form-row textarea:focus,.form-row select:focus { outline:none; border-color:var(--border-mid); }
+  .form-row textarea { resize:vertical; min-height:52px; }
+  .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  /* buttons */
+  .btn { display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:var(--radius); font-size:13px; font-weight:500; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit; transition:background 0.1s,opacity 0.1s; white-space:nowrap; }
+  .btn:hover { background:var(--bg); }
+  .btn:active { opacity:0.8; }
+  .btn-primary { background:var(--text); color:var(--surface); border-color:var(--text); }
+  .btn-primary:hover { opacity:0.88; background:var(--text); }
+  .btn-primary:disabled { opacity:0.4; cursor:not-allowed; }
+  .btn-sm { padding:4px 10px; font-size:12px; }
+  .btn-ghost { border-color:transparent; background:transparent; color:var(--text-2); }
+  .btn-ghost:hover { background:var(--bg); border-color:transparent; }
+  .action-row { display:flex; gap:8px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+  /* results */
+  .verdict-bar { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); }
+  .verdict-pill { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:100px; font-size:12px; font-weight:600; }
+  .verdict-pill.pass { background:var(--green-bg); color:var(--green); }
+  .verdict-pill.fail { background:var(--red-bg); color:var(--red); }
+  .verdict-pill.warn { background:var(--amber-bg); color:var(--amber); }
+  .verdict-pill.pending { background:var(--bg); color:var(--text-3); }
+  .verdict-summary { font-size:13px; color:var(--text-2); flex:1; }
+  .check-table { width:100%; border-collapse:collapse; }
+  .check-table th { text-align:left; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); padding:7px 16px; border-bottom:1px solid var(--border); background:var(--bg); }
+  .check-table td { padding:9px 16px; border-bottom:1px solid var(--border); vertical-align:top; font-size:13px; }
+  .check-table tr:last-child td { border-bottom:none; }
+  .check-table tr:hover td { background:var(--bg); }
+  .status-dot { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:500; white-space:nowrap; }
+  .status-dot::before { content:''; display:inline-block; width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .status-dot.pass { color:var(--green); } .status-dot.pass::before { background:var(--green); }
+  .status-dot.fail { color:var(--red); } .status-dot.fail::before { background:var(--red); }
+  .status-dot.warn { color:var(--amber); } .status-dot.warn::before { background:var(--amber); }
+  .status-dot.skip { color:var(--text-3); } .status-dot.skip::before { background:var(--text-3); }
+  .field-note { color:var(--text-2); font-size:12px; margin-top:2px; }
+  .field-found { font-size:11px; color:var(--text-3); margin-top:3px; }
+  .diff-old { background:var(--red-bg); color:var(--red); padding:1px 4px; border-radius:3px; text-decoration:line-through; font-family:'SF Mono','Fira Code',monospace; font-size:11px; }
+  .diff-new { background:var(--green-bg); color:var(--green); padding:1px 4px; border-radius:3px; font-family:'SF Mono','Fira Code',monospace; font-size:11px; }
+  .warning-compare { margin-top:6px; padding:7px 10px; background:var(--red-bg); border:1px solid var(--border); border-radius:var(--radius); font-size:11px; font-family:'SF Mono','Fira Code',monospace; color:var(--red); line-height:1.6; word-break:break-word; }
+  /* agent feedback */
+  .feedback-row { display:flex; align-items:center; gap:8px; padding:9px 16px; border-bottom:1px solid var(--border); font-size:13px; flex-wrap:wrap; }
+  .feedback-row:last-child { border-bottom:none; }
+  .feedback-field { width:120px; flex-shrink:0; color:var(--text-2); font-size:12px; }
+  .feedback-ai { width:70px; flex-shrink:0; }
+  .feedback-override { display:flex; gap:4px; align-items:center; flex:1; flex-wrap:wrap; }
+  .override-btn { padding:3px 8px; font-size:11px; border-radius:4px; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text-2); font-family:inherit; transition:all 0.1s; }
+  .override-btn:hover { background:var(--bg); }
+  .override-btn.sel-pass { background:var(--green-bg); color:var(--green); border-color:var(--green); }
+  .override-btn.sel-fail { background:var(--red-bg); color:var(--red); border-color:var(--red); }
+  .override-btn.sel-warn { background:var(--amber-bg); color:var(--amber); border-color:var(--amber); }
+  .feedback-note-input { flex:1; min-width:120px; padding:3px 7px; font-size:12px; border:1px solid var(--border); border-radius:4px; background:var(--bg); color:var(--text); font-family:inherit; }
+  .feedback-note-input:focus { outline:none; border-color:var(--border-mid); }
+  /* export bar */
+  .export-bar { padding:9px 16px; border-top:1px solid var(--border); display:flex; gap:8px; align-items:center; background:var(--bg); flex-wrap:wrap; }
+  .export-bar-label { font-size:12px; color:var(--text-3); flex:1; }
+  /* integrations */
+  .int-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:14px; }
+  .int-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px; }
+  .int-card-head { display:flex; align-items:flex-start; gap:12px; margin-bottom:12px; }
+  .int-icon { width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .int-icon svg { width:18px; height:18px; }
+  .int-title { font-size:14px; font-weight:600; }
+  .int-desc { font-size:12px; color:var(--text-2); margin-top:2px; line-height:1.5; }
+  .int-status { display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:100px; margin-top:4px; }
+  .int-status.on { background:var(--green-bg); color:var(--green); }
+  .int-status.off { background:var(--bg); color:var(--text-3); border:1px solid var(--border); }
+  .int-status.always { background:var(--blue-bg); color:var(--blue); }
+  .int-fields { display:flex; flex-direction:column; gap:7px; margin-bottom:10px; }
+  .int-field-row { display:flex; gap:6px; align-items:center; }
+  .int-field-row label { font-size:11px; color:var(--text-3); width:82px; flex-shrink:0; }
+  .int-field-row input,.int-field-row select { flex:1; padding:5px 8px; font-size:12px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg); color:var(--text); font-family:inherit; }
+  .int-field-row input:focus,.int-field-row select:focus { outline:none; border-color:var(--border-mid); }
+  .int-toggle { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .toggle-switch { position:relative; width:34px; height:19px; cursor:pointer; flex-shrink:0; }
+  .toggle-switch input { opacity:0; width:0; height:0; position:absolute; }
+  .toggle-track { position:absolute; top:0; left:0; right:0; bottom:0; background:var(--border-mid); border-radius:10px; transition:background 0.2s; }
+  .toggle-switch input:checked + .toggle-track { background:var(--green); }
+  .toggle-thumb { position:absolute; top:2.5px; left:2.5px; width:14px; height:14px; background:white; border-radius:50%; transition:transform 0.2s; pointer-events:none; }
+  .toggle-switch input:checked ~ .toggle-thumb { transform:translateX(15px); }
+  .toggle-label { font-size:13px; color:var(--text-2); }
+  .test-result { font-size:12px; margin-top:8px; padding:6px 10px; border-radius:var(--radius); }
+  .test-result.ok { background:var(--green-bg); color:var(--green); }
+  .test-result.err { background:var(--red-bg); color:var(--red); }
+  /* feedback log */
+  .log-table { width:100%; border-collapse:collapse; }
+  .log-table th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); padding:7px 14px; border-bottom:1px solid var(--border); font-weight:600; background:var(--bg); }
+  .log-table td { padding:8px 14px; border-bottom:1px solid var(--border); font-size:12px; vertical-align:top; }
+  .log-table tr:last-child td { border-bottom:none; }
+  .correction-badge { font-size:10px; padding:2px 6px; border-radius:4px; font-weight:500; margin-left:4px; }
+  .cb-changed { background:var(--amber-bg); color:var(--amber); }
+  .cb-confirmed { background:var(--green-bg); color:var(--green); }
+  /* misc */
+  .history-row { display:flex; align-items:center; gap:10px; padding:8px 16px; border-bottom:1px solid var(--border); font-size:12px; color:var(--text-2); }
+  .history-row:last-child { border-bottom:none; }
+  .history-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }
+  .history-time { color:var(--text-3); flex-shrink:0; }
+  .empty { padding:22px 16px; font-size:13px; color:var(--text-3); text-align:center; }
+  .skel-row { height:12px; background:var(--border); border-radius:4px; margin:10px 16px; animation:pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .spin { display:inline-block; width:13px; height:13px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:spn 0.65s linear infinite; flex-shrink:0; }
+  @keyframes spn { to { transform:rotate(360deg); } }
+  .page-header { margin-bottom:20px; }
+  .page-header h2 { font-size:18px; font-weight:600; margin-bottom:4px; }
+  .page-header p { font-size:13px; color:var(--text-2); }
+  .section-label { font-size:11px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-3); }
+  .json-box { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:10px; font-size:10.5px; font-family:'SF Mono','Fira Code',monospace; color:var(--text-2); white-space:pre-wrap; word-break:break-all; max-height:180px; overflow-y:auto; }
+  .copy-row { display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .how-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+  .how-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:14px; }
+  .how-card h3 { font-size:13px; font-weight:600; margin-bottom:5px; }
+  .how-card p { font-size:12px; color:var(--text-2); line-height:1.55; }
+  .divider { border:none; border-top:1px solid var(--border); margin:20px 0; }
+  .toast { position:fixed; bottom:20px; right:20px; background:var(--text); color:var(--surface); font-size:13px; padding:9px 14px; border-radius:var(--radius); z-index:999; opacity:0; transition:opacity 0.2s; pointer-events:none; }
+  .toast.show { opacity:1; }
+  /* bev type buttons */
+  .bev-btn { padding:5px 12px; font-size:12px; font-weight:500; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text-2); cursor:pointer; font-family:inherit; transition:all 0.1s; white-space:nowrap; }
+  .bev-btn:hover { background:var(--bg); }
+  .bev-btn.active { background:var(--blue-bg); color:var(--blue); border-color:var(--blue); }
+  /* requirement banner */
+  .req-banner { margin-top:12px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .req-banner-title { font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-3); padding:8px 12px 6px; background:var(--bg); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px; }
+  .req-banner-items { padding:8px 12px; display:flex; flex-direction:column; gap:3px; }
+  .req-item { font-size:12px; color:var(--text-2); display:flex; align-items:baseline; gap:6px; line-height:1.5; }
+  .req-item::before { content:""; display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--border-mid); flex-shrink:0; margin-top:4px; }
+  .req-item.mandatory::before { background:var(--red); }
+  .req-item.conditional::before { background:var(--amber); }
+  .req-item strong { color:var(--text); font-weight:500; }
+  .req-banner-link { display:block; font-size:11px; color:var(--blue); padding:5px 12px 8px; text-decoration:none; border-top:1px solid var(--border); background:var(--bg); }
+  .req-banner-link:hover { text-decoration:underline; }
+  .req-legend { display:flex; gap:12px; padding:0 12px 8px; }
+  .req-legend-item { font-size:11px; color:var(--text-3); display:flex; align-items:center; gap:4px; }
+  .req-legend-item::before { content:""; display:inline-block; width:5px; height:5px; border-radius:50%; }
+  .req-legend-item.m::before { background:var(--red); }
+  .req-legend-item.c::before { background:var(--amber); }
+  /* warning detail card */
+  .warning-detail { margin-top:14px; border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; }
+  .warning-detail-head { padding:10px 14px; background:var(--red-bg); border-bottom:1px solid var(--border); font-size:12px; font-weight:600; color:var(--red); }
+  .warning-detail-body { padding:12px 14px; font-size:12px; color:var(--text-2); line-height:1.7; }
+  .warning-detail-body strong { color:var(--text); }
+  .warning-text-box { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:10px 12px; font-size:12px; font-family:'SF Mono','Fira Code',monospace; color:var(--text); line-height:1.7; margin:8px 0; word-break:break-word; }
+  .warning-text-box strong { font-weight:700; }
+  .font-rule { display:flex; gap:8px; align-items:center; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:8px 12px; margin-top:6px; font-size:12px; color:var(--text-2); }
+  .font-rule-size { font-weight:600; color:var(--text); min-width:30px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="logo-mark">
+      <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 1L2 4v4c0 3.31 2.58 6.41 6 7 3.42-.59 6-3.69 6-7V4L8 1z"/></svg>
+    </div>
+    <h1>TTB Label Verifier</h1>
+    <span class="topbar-sub">· COLA Compliance Prototype</span>
+  </div>
+  <div class="topbar-right">
+    <button class="nav-btn active" id="navVerify" onclick="showPage('verify',this)">Verify</button>
+    <button class="nav-btn" id="navIntegrations" onclick="showPage('integrations',this)">Integrations</button>
+    <button class="nav-btn" id="navFeedback" onclick="showPage('feedback',this)">Agent feedback</button>
+    <div class="key-field">
+      <label for="apiKey">API key</label>
+      <input type="password" id="apiKey" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false" oninput="localStorage.setItem('ttb_key',this.value)" />
+    </div>
+  </div>
+</header>
+
+<div id="toast" class="toast"></div>
+
+<main class="main">
+
+<!-- ═══ VERIFY ══════════════════════════════════════════════════════════════ -->
+<div class="page active" id="page-verify">
+
+<div class="warning-detail" style="margin-bottom:18px;">
+  <div class="warning-detail-head">&#9888;&#65039; Government Health Warning Statement — 27 CFR Part 16 (mandatory on ALL alcohol beverages)</div>
+  <div class="warning-detail-body">
+    <p style="margin-bottom:8px;">Required verbatim on every alcohol beverage containing <strong>≥ 0.5% ABV</strong>, domestic and imported, per the Alcoholic Beverage Labeling Act of 1988.</p>
+    <div class="warning-text-box"><strong>GOVERNMENT WARNING:</strong> (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-top:10px;">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Formatting rules (27 CFR 16.22)</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:1.7;">
+          "GOVERNMENT WARNING:" must be <strong>ALL CAPS + bold</strong><br>
+          Remainder must <strong>not</strong> be bold<br>
+          Must appear <strong>separate and apart</strong> from all other information<br>
+          Must be on a <strong>contrasting background</strong><br>
+          Must appear as a <strong>continuous</strong> statement — cannot be split
+        </div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Minimum type size</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:1.9;">
+          <span style="font-weight:600;color:var(--text);">1 mm</span> — containers ≤ 237 ml (8 fl. oz.)<br>
+          <span style="font-weight:600;color:var(--text);">2 mm</span> — containers 237 ml – 3 L (8–101 fl. oz.)<br>
+          <span style="font-weight:600;color:var(--text);">3 mm</span> — containers > 3 L (101 fl. oz.)
+        </div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Common failure modes</div>
+        <div style="font-size:12px;color:var(--red);line-height:1.7;">
+          "Government Warning:" (title case)<br>
+          Bold on full statement (not just heading)<br>
+          Wrong, paraphrased, or truncated text<br>
+          Buried in other text (not separate &amp; apart)<br>
+          Type too small to be legible
+        </div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Placement</div>
+        <div style="font-size:12px;color:var(--text-2);line-height:1.7;">
+          May appear on any <strong>front, back, or side label</strong><br>
+          Applies to all three beverage types<br>
+          <a href="https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-16" target="_blank" rel="noopener" style="color:var(--blue);">27 CFR Part 16 ↗</a> ·
+          <a href="https://www.ttb.gov/regulated-commodities/beverage-alcohol/beer/labeling/malt-beverage-health-warning" target="_blank" rel="noopener" style="color:var(--blue);">Malt beverage guidance ↗</a> ·
+          <a href="https://www.ttb.gov/regulated-commodities/beverage-alcohol/distilled-spirits/ds-labeling-home/ds-health-warning" target="_blank" rel="noopener" style="color:var(--blue);">Distilled spirits guidance ↗</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="pane-grid">
+  <div style="display:flex;flex-direction:column;gap:14px;">
+
+    <div class="card">
+      <div class="card-head">Label image</div>
+      <div class="card-body">
+        <div class="drop-zone" id="dropZone">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l4-4 4 4 4-6 4 6"/><rect x="2" y="2" width="20" height="20" rx="3"/></svg>
+          <p>Drop image here or click to upload</p>
+          <small>JPG · PNG · WEBP · max 5 MB</small>
+        </div>
+        <div class="preview-wrap" id="previewWrap" style="display:none;">
+          <img id="previewImg" class="preview-img" alt="Uploaded label" />
+          <button class="preview-change" id="changeBtn">Change</button>
+        </div>
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" style="display:none;">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        Batch mode
+        <button class="btn btn-sm btn-ghost" id="batchPickBtn">Select images</button>
+      </div>
+      <div>
+        <input type="file" id="batchInput" accept="image/jpeg,image/png,image/webp" multiple style="display:none;">
+        <div id="batchList"><p class="empty" style="padding:14px;">Queue multiple labels for a single run.</p></div>
+        <div id="batchRunBar" style="display:none;padding:9px 14px;border-top:1px solid var(--border);gap:10px;align-items:center;">
+          <button class="btn btn-primary btn-sm" id="batchRunBtn">
+            <span class="spin" id="batchSpin" style="display:none;"></span> Run batch
+          </button>
+          <span id="batchProgress" style="font-size:12px;color:var(--text-3);"></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:14px;">
+    <div class="card">
+      <div class="card-head">
+        COLA application fields
+        <button class="btn btn-ghost btn-sm" id="demoBtn">Load demo</button>
+      </div>
+      <div class="card-body">
+        <div class="form-row">
+          <label>Beverage type <span style="font-weight:400;text-transform:none;letter-spacing:0;">(sets verification rules)</span></label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;" id="bevTypeGroup">
+            <button type="button" class="bev-btn active" data-type="spirits" onclick="setBevType('spirits',this)">Distilled spirits</button>
+            <button type="button" class="bev-btn" data-type="malt" onclick="setBevType('malt',this)">Malt beverage</button>
+            <button type="button" class="bev-btn" data-type="wine" onclick="setBevType('wine',this)">Wine</button>
+          </div>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row"><label>Brand name</label><input type="text" id="fBrand" placeholder="OLD TOM DISTILLERY" /></div>
+          <div class="form-row"><label>Class / type</label><input type="text" id="fClass" placeholder="Kentucky Straight Bourbon Whiskey" /></div>
+        </div>
+        <div class="form-grid-2">
+          <div class="form-row"><label>Alcohol content</label><input type="text" id="fABV" placeholder="45% Alc./Vol. (90 Proof)" /></div>
+          <div class="form-row"><label>Net contents</label><input type="text" id="fNet" placeholder="750 mL" /></div>
+        </div>
+        <div class="form-row"><label>Bottler / producer name &amp; address</label><input type="text" id="fProducer" placeholder="Old Tom Distillery LLC, Louisville, KY 40202" /></div>
+        <div class="form-row"><label>Country of origin <span style="font-weight:400;text-transform:none;letter-spacing:0;">(imports only)</span></label><input type="text" id="fOrigin" placeholder="Leave blank if domestic" /></div>
+        <div class="form-row"><label>Reviewer notes</label><textarea id="fNotes" placeholder="Optional context for the AI reviewer…"></textarea></div>
+        <div id="reqBanner" class="req-banner">
+          <div id="reqTitle" class="req-banner-title"></div>
+          <div id="reqItems" class="req-banner-items"></div>
+          <a id="reqLink" href="#" target="_blank" rel="noopener" class="req-banner-link">View full CFR requirements ↗</a>
+        </div>
+        <div class="action-row">
+          <button class="btn btn-primary" id="verifyBtn" disabled>
+            <span class="spin" id="verifySpin" style="display:none;"></span> Verify label
+          </button>
+          <button class="btn btn-ghost btn-sm" id="clearBtn">Clear</button>
+          <span id="statusMsg" style="font-size:12px;color:var(--text-3);margin-left:4px;"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="resultCard" style="display:none;">
+      <div class="card-head">
+        Verification result
+        <span id="resultTimestamp" style="font-weight:400;text-transform:none;letter-spacing:0;font-size:12px;color:var(--text-3);"></span>
+      </div>
+      <div class="verdict-bar">
+        <span class="verdict-pill pending" id="verdictPill">Checking…</span>
+        <span class="verdict-summary" id="verdictSummary"></span>
+      </div>
+      <div id="resultBody"></div>
+
+      <div id="agentOverrideSection" style="display:none;">
+        <div style="padding:9px 16px;border-top:1px solid var(--border);background:var(--bg);display:flex;align-items:center;gap:10px;">
+          <span class="section-label">Agent override</span>
+          <span style="font-size:12px;color:var(--text-3);">Correct any AI decision. Corrections are logged for improvement.</span>
+        </div>
+        <div id="feedbackRows"></div>
+        <div style="padding:9px 16px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;">
+          <button class="btn btn-sm btn-primary" id="saveFeedbackBtn">Save corrections</button>
+          <span id="feedbackSaved" style="font-size:12px;color:var(--green);display:none;">Saved to feedback log</span>
+        </div>
+      </div>
+
+      <div id="jsonSection" style="display:none;border-top:1px solid var(--border);padding:12px 16px;">
+        <div class="section-label" style="margin-bottom:6px;">JSON output</div>
+        <div class="json-box" id="jsonBox"></div>
+        <div class="copy-row">
+          <button class="btn btn-sm" id="copyJsonBtn">Copy JSON</button>
+          <span style="font-size:12px;color:var(--text-3);">Pipe this into any system via the Integrations webhooks</span>
+        </div>
+      </div>
+
+      <div class="export-bar" id="exportBar" style="display:none;">
+        <span class="export-bar-label">Export</span>
+        <button class="btn btn-sm" id="exportCSVBtn">CSV</button>
+        <button class="btn btn-sm" id="exportHTMLBtn">HTML report</button>
+        <button class="btn btn-sm" id="manualWebhookBtn" style="display:none;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+          Send to webhook
+        </button>
+      </div>
+    </div>
+
+    <div class="card" id="historyCard" style="display:none;">
+      <div class="card-head">Session history</div>
+      <div id="historyBody"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══ INTEGRATIONS ════════════════════════════════════════════════════════ -->
+<div class="page" id="page-integrations">
+  <div class="page-header">
+    <h2>Integrations</h2>
+    <p>Built for the Microsoft ecosystem. Connect Teams, Power Automate, or any REST endpoint. Results push automatically. Config is saved in your browser.</p>
+  </div>
+  <div class="int-grid">
+
+    <div class="int-card">
+      <div class="int-card-head">
+        <div class="int-icon" style="background:var(--blue-bg);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+        </div>
+        <div>
+          <div class="int-title">Webhook / REST</div>
+          <div class="int-desc">POST results to any URL — Power Automate HTTP triggers, n8n, your COLA case management system, or any custom REST endpoint.</div>
+          <span class="int-status off" id="webhookStatus">Not configured</span>
+        </div>
+      </div>
+      <div class="int-toggle">
+        <label class="toggle-switch"><input type="checkbox" id="webhookEnabled"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        <span class="toggle-label">Enabled</span>
+      </div>
+      <div class="int-fields">
+        <div class="int-field-row"><label>Endpoint URL</label><input type="url" id="webhookUrl" placeholder="https://hooks.zapier.com/…" /></div>
+        <div class="int-field-row"><label>Auth header</label><input type="password" id="webhookSecret" placeholder="Optional token" /></div>
+        <div class="int-field-row"><label>Fire on</label>
+          <select id="webhookTrigger"><option value="all">All results</option><option value="fail">Failures only</option><option value="warn_fail">Warnings &amp; failures</option></select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-primary" onclick="saveWebhook()">Save</button>
+        <button class="btn btn-sm" onclick="testWebhook()">Test connection</button>
+      </div>
+      <div id="webhookTestResult" style="display:none;" class="test-result"></div>
+    </div>
+
+    <div class="int-card">
+      <div class="int-card-head">
+        <div class="int-icon" style="background:#eef2ff;">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19.5 8a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" fill="#5059C9"/>
+            <path d="M22 9.5h-5a1 1 0 00-1 1v4a3 3 0 006 0v-4a1 1 0 00-1-1z" fill="#5059C9" opacity=".8"/>
+            <path d="M12 12a3 3 0 100-6 3 3 0 000 6z" fill="#7B83EB"/>
+            <path d="M16 13.5H8a1 1 0 00-1 1V19a4 4 0 008 0v-4.5a1 1 0 00-1-1z" fill="#7B83EB" opacity=".8"/>
+          </svg>
+        </div>
+        <div>
+          <div class="int-title">Microsoft Teams</div>
+          <div class="int-desc">Post Adaptive Card alerts to any Teams channel via Incoming Webhook. Built for M365 government tenants.</div>
+          <span class="int-status off" id="teamsStatus">Not configured</span>
+        </div>
+      </div>
+      <div class="int-toggle">
+        <label class="toggle-switch"><input type="checkbox" id="teamsEnabled"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        <span class="toggle-label">Enabled</span>
+      </div>
+      <div class="int-fields">
+        <div class="int-field-row"><label>Webhook URL</label><input type="url" id="teamsUrl" placeholder="https://prod.webhook.office.com/…" /></div>
+        <div class="int-field-row"><label>Channel name</label><input type="text" id="teamsChannel" placeholder="Label Review (display only)" /></div>
+        <div class="int-field-row"><label>Notify on</label>
+          <select id="teamsTrigger"><option value="fail">Failures only</option><option value="warn_fail">Warnings &amp; failures</option><option value="all">All results</option></select>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--text-3);line-height:1.5;margin-bottom:10px;">Set up: Teams channel &#8594; &#xB7;&#xB7;&#xB7; &#8594; Connectors &#8594; Incoming Webhook &#8594; copy URL here.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-primary" onclick="saveTeams()">Save</button>
+        <button class="btn btn-sm" onclick="testTeams()">Send test card</button>
+      </div>
+      <div id="teamsTestResult" style="display:none;" class="test-result"></div>
+    </div>
+    </div>
+
+    <div class="int-card">
+      <div class="int-card-head">
+        <div class="int-icon" style="background:#e3f2fd;">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="3" width="8" height="8" rx="1.5" fill="#0078D4" opacity=".9"/>
+            <rect x="13" y="3" width="8" height="8" rx="1.5" fill="#0078D4" opacity=".6"/>
+            <rect x="3" y="13" width="8" height="8" rx="1.5" fill="#0078D4" opacity=".6"/>
+            <rect x="13" y="13" width="8" height="8" rx="1.5" fill="#0078D4" opacity=".35"/>
+          </svg>
+        </div>
+        <div>
+          <div class="int-title">Power Automate</div>
+          <div class="int-desc">Trigger any M365 flow — Outlook email, SharePoint list entries, Dynamics 365 cases, or Excel Online logs.</div>
+          <span class="int-status off" id="emailStatus">Not configured</span>
+        </div>
+      </div>
+      <div class="int-toggle">
+        <label class="toggle-switch"><input type="checkbox" id="emailEnabled"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        <span class="toggle-label">Enabled</span>
+      </div>
+      <div class="int-fields">
+        <div class="int-field-row"><label>Flow URL</label><input type="url" id="emailUrl" placeholder="https://prod.flow.microsoft.com/…" /></div>
+        <div class="int-field-row"><label>Notify on</label>
+          <select id="emailTrigger"><option value="fail">Failures only</option><option value="warn_fail">Warnings &amp; failures</option><option value="all">All results</option></select>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--text-3);line-height:1.5;margin-bottom:10px;">Set up: Power Automate &#8594; New flow &#8594; "When an HTTP request is received" trigger &#8594; paste URL here. Connect to Outlook, SharePoint, Excel, or Dynamics 365.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm btn-primary" onclick="saveEmail()">Save</button>
+        <button class="btn btn-sm" onclick="testEmail()">Send test payload</button>
+      </div>
+      <div id="emailTestResult" style="display:none;" class="test-result"></div>
+    </div>
+    <div class="int-card">
+      <div class="int-card-head">
+        <div class="int-icon" style="background:var(--amber-bg);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <div>
+          <div class="int-title">JSON / API output</div>
+          <div class="int-desc">Every result is structured JSON. Copy from the result view or stream automatically via any webhook above.</div>
+          <span class="int-status always">Always available</span>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--text-2);margin-bottom:10px;line-height:1.6;">Schema emitted on every verification:</p>
+      <div class="json-box" style="font-size:10px;">{
+  "id": "verify_1718123456789",
+  "timestamp": "2024-06-11T14:22:36Z",
+  "label": "OLD TOM DISTILLERY",
+  "overall": "fail",
+  "summary": "Government warning missing required all-caps format.",
+  "checks": [
+    { "field": "brand_name", "status": "pass",
+      "found": "OLD TOM DISTILLERY",
+      "expected": "OLD TOM DISTILLERY", "note": "" },
+    { "field": "govt_warning", "status": "fail",
+      "found": "Government Warning: ...",
+      "expected": "GOVERNMENT WARNING: ...",
+      "note": "Title case instead of all caps" }
+  ],
+  "agent_feedback": []
+}</div>
+      <p style="font-size:11px;color:var(--text-3);margin-top:8px;">All integrations send this JSON payload. Teams additionally wraps it as an Adaptive Card.</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ FEEDBACK ═════════════════════════════════════════════════════════════ -->
+<div class="page" id="page-feedback">
+  <div class="page-header">
+    <h2>Agent feedback log</h2>
+    <p>Every time an agent overrides an AI verdict it's recorded here. Export for model fine-tuning or rule updates.</p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+    <button class="btn btn-primary btn-sm" id="exportFeedbackBtn">Export CSV</button>
+    <button class="btn btn-sm" id="clearFeedbackBtn">Clear log</button>
+    <span id="feedbackCount" style="font-size:12px;color:var(--text-3);margin-left:4px;"></span>
+  </div>
+  <div class="card" id="feedbackLogCard">
+    <div id="feedbackLogBody"><p class="empty">No corrections recorded yet. Use the Agent override section after verifying a label.</p></div>
+  </div>
+  <hr class="divider">
+  <div class="page-header" style="margin-top:0;">
+    <h2 style="font-size:15px;">How corrections feed back into the system</h2>
+  </div>
+  <div class="how-grid">
+    <div class="how-card"><h3>1. Agent corrects verdict</h3><p>After verifying, flip any field result and add a note explaining why the AI was wrong (or right).</p></div>
+    <div class="how-card"><h3>2. Correction is logged</h3><p>Each override is saved with the AI decision, agent decision, timestamp, and context — persisted in localStorage.</p></div>
+    <div class="how-card"><h3>3. Export for fine-tuning</h3><p>Download the CSV as a labeled dataset for prompt refinement, rule updates, or supervised fine-tuning of the model.</p></div>
+    <div class="how-card"><h3>4. Stream to Teams or Power Automate</h3><p>Corrections fire to configured integrations in real time — appear in a Teams channel or trigger a Power Automate flow automatically.</p></div>
+  </div>
+</div>
+
+</main>
+
+<script>
+const REQUIRED_WARNING = "GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.";
+
+function buildSystemPrompt(bevType) {
+  const typeRules = {
+    spirits: `BEVERAGE TYPE: Distilled Spirits (27 CFR Part 5, Subpart A General Provisions)
+SAME FIELD OF VISION REQUIRED: Brand name + Alcohol content + Class/type designation must ALL appear on the same single side of the container where they can be viewed simultaneously without turning it (27 CFR 5.63(a)). For cylindrical containers, one side = 40% of circumference. Flag if these three items are not co-located.
+Alcohol content: must state percentage of alcohol by volume. "Proof" alone is not acceptable. Both % ABV and proof together are common and acceptable (27 CFR 5.65).
+Name and address (bottler/distiller/importer) and net contents may appear anywhere on the container (27 CFR 5.63(b)).
+Age statement: required on label if straight whisky is less than 4 years old (27 CFR 5.74). If age is stated, verify it.
+Neutral spirits: if ≥2.5% neutral spirits, source must be disclosed (27 CFR 5.75).`,
+    malt: `BEVERAGE TYPE: Malt Beverage (27 CFR Part 7)
+Alcohol content: ONLY mandatory if the product contains alcohol from added flavors or non-beverage ingredients (other than hop extract). If shown, "ABV" abbreviation is NOT acceptable — must spell out "alcohol by volume" or use approved abbreviations per 27 CFR 7.65. Flag if "ABV" abbreviation is used.
+Class and type designation: required (e.g., "Beer", "Ale", "Lager"). Generic designation like "Beer" is acceptable.
+No same-field-of-vision requirement for malt beverages.`,
+    wine: `BEVERAGE TYPE: Wine (27 CFR Part 4 — see TTB Anatomy of a Wine Label)
+Applies to wines with ≥7% alcohol by volume.
+Brand label must contain: brand name AND class/type designation. These are required on the BRAND LABEL specifically, not just anywhere on the container.
+Class/type: a wine color alone (e.g., "Rosé") is NOT a valid class/type. Must be a designation like "Rosé Wine", "Table Wine", "Sparkling Wine", "Chardonnay" etc.
+Alcohol content: MANDATORY for wines >14% ABV. Optional for 7–14% ABV only if "table wine" or "light wine" appears as the class/type designation. "ABV" is NOT an acceptable abbreviation — must use "alcohol by volume" or "alc. by vol." (27 CFR 4.36).
+Appellation of origin: MANDATORY on the brand label when: (a) a grape variety is used as the class/type designation, (b) a vintage date appears on the label, or (c) a geographic area is implied. If stated, ≥75% of grapes must be from that area (≥85% for state/county appellations) (27 CFR 4.25).
+Grape variety as class/type: if used, ≥75% of wine must derive from that variety, and appellation of origin is required.
+Sulfites: if present at ≥10 ppm, must declare "Contains sulfites" or similar (27 CFR 4.32(e)).
+Name and address must match bottler's/importer's basic permit exactly — city and state required.`
+  };
+  return `You are a TTB COLA label compliance specialist. Compare the label image against the COLA application data and return only a JSON object.
+
+${typeRules[bevType] || typeRules.spirits}
+
+GOVERNMENT WARNING (27 CFR Part 16 — mandatory on ALL alcohol beverages ≥0.5% ABV):
+Required verbatim text: "${REQUIRED_WARNING}"
+Rules:
+- "GOVERNMENT WARNING:" must be in ALL CAPS and BOLD (27 CFR 16.22)
+- Remainder of statement must NOT be bold
+- Must appear SEPARATE AND APART from all other information (27 CFR 16.21)
+- Must be on contrasting background and readily legible
+- Minimum type size: 1mm for ≤237ml containers, 2mm for 237ml–3L, 3mm for >3L (27 CFR 16.22)
+- Must appear as a CONTINUOUS statement — cannot be split across labels
+- Applies to domestic AND imported products (27 CFR 16.20)
+Common failures: title case ("Government Warning:"), missing bold, wrong text, split across labels, too small to read.
+
+Statuses: pass (matches/compliant), warn (close match needing human review), fail (clear mismatch, violation, or missing required element), skip (field not provided in application — still read what you see on label).
+
+Return ONLY this JSON, no markdown:
+{"overall":"pass|fail|warn","summary":"one sentence for the reviewing agent","checks":[{"field":"brand_name","label":"Brand name","status":"...","found":"...","expected":"...","note":""},{"field":"class_type","label":"Class / type","status":"...","found":"...","expected":"...","note":""},{"field":"abv","label":"Alcohol content","status":"...","found":"...","expected":"...","note":""},{"field":"net_contents","label":"Net contents","status":"...","found":"...","expected":"...","note":""},{"field":"producer","label":"Bottler / producer","status":"...","found":"...","expected":"...","note":""},{"field":"origin","label":"Country of origin","status":"...","found":"...","expected":"...","note":""},{"field":"govt_warning","label":"Government warning","status":"...","found":"abbreviated found text","expected":"exact required text","note":"specific issue if any"}]}`;
+}
+
+const $ = id => document.getElementById(id);
+
+// ── API key: restore from localStorage on load, save on entry
+(function restoreKey(){
+  const saved = localStorage.getItem('ttb_key');
+  if (saved) {
+    // wait for DOM
+    document.addEventListener('DOMContentLoaded', () => {
+      const el = $('apiKey');
+      if (el) el.value = saved;
+    }, { once: true });
+  }
+})();
+
+function getKey() {
+  // 1. Whatever is in the field right now
+  let key = ($('apiKey')?.value || '').trim();
+  // 2. Fall back to localStorage
+  if (!key) key = (localStorage.getItem('ttb_key') || '').trim();
+  // 3. Persist whatever we found back to the field + storage
+  if (key) {
+    localStorage.setItem('ttb_key', key);
+    const el = $('apiKey');
+    if (el && !el.value) el.value = key;
+  }
+  return key || null;
+}
+let imageData=null, imageType=null, lastResult=null;
+let sessionHistory=[], batchFiles=[], agentOverrides={};
+let feedbackLog = [];
+try { feedbackLog = JSON.parse(localStorage.getItem('ttb_fb')||'[]'); } catch(e) {}
+let currentBevType = 'spirits';
+
+const BEV_REQS = {
+  spirits: {
+    title: 'Distilled Spirits · 27 CFR Part 5',
+    link: 'https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-5/subpart-A',
+    linkLabel: 'General Provisions — 27 CFR Part 5 Subpart A ↗',
+    note: 'Brand name, alcohol content, and class/type designation must all appear in the SAME FIELD OF VISION — a single side of the container where all three can be viewed simultaneously without turning it (27 CFR 5.63(a)). For cylindrical containers, one side = 40% of circumference.',
+    items: [
+      { text: 'Brand name — on the brand label (27 CFR 5.64)', cls: 'mandatory' },
+      { text: 'Class/type designation — e.g., "Bourbon Whisky", "Vodka", "Rum" — on brand label in same field of vision (27 CFR 5.63(a), Subpart I)', cls: 'mandatory' },
+      { text: 'Alcohol content as % by volume — "Proof" alone is NOT acceptable; both % ABV and proof are common (27 CFR 5.65)', cls: 'mandatory' },
+      { text: 'Name and address of bottler or distiller; or importer for imported products (27 CFR 5.66–5.68)', cls: 'mandatory' },
+      { text: 'Net contents — may be blown, embossed, or molded into container (27 CFR 5.70)', cls: 'mandatory' },
+      { text: 'Government Health Warning Statement (27 CFR Part 16)', cls: 'mandatory' },
+      { text: 'Country of origin for imported products (CBP regulations)', cls: 'conditional' },
+      { text: 'Age statement — required for straight whiskies aged less than 4 years (27 CFR 5.74)', cls: 'conditional' },
+      { text: 'Neutral spirits source — if spirits contain ≥2.5% neutral spirits (27 CFR 5.75)', cls: 'conditional' },
+      { text: 'Coloring/flavoring/blending material disclosure for certain designations (27 CFR 5.76)', cls: 'conditional' },
+      { text: 'FD&C Yellow No. 5, aspartame, cochineal extract/carmine, or sulfites if used (27 CFR 5.63(c))', cls: 'conditional' },
+    ]
+  },
+  malt: {
+    title: 'Malt Beverage · 27 CFR Part 7',
+    link: 'https://www.ecfr.gov/current/title-27/chapter-I/subchapter-A/part-7/subpart-A',
+    linkLabel: 'General Provisions — 27 CFR Part 7 Subpart A ↗',
+    note: 'No same-field-of-vision requirement for malt beverages. Mandatory information may appear on any label on the container. Net contents and name/address may be blown, embossed, or molded into the container (27 CFR 7.61).',
+    items: [
+      { text: 'Brand name (27 CFR 7.64)', cls: 'mandatory' },
+      { text: 'Class and type designation — e.g., "Beer", "Ale", "Lager", "Porter" (27 CFR 7.141–7.143)', cls: 'mandatory' },
+      { text: 'Name and address — domestic bottler or importer (27 CFR 7.66–7.68)', cls: 'mandatory' },
+      { text: 'Net contents — may be blown/embossed into container (27 CFR 7.70)', cls: 'mandatory' },
+      { text: 'Government Health Warning Statement (27 CFR Part 16)', cls: 'mandatory' },
+      { text: 'Alcohol content — ONLY mandatory if product contains alcohol from added flavors or non-beverage ingredients (other than hop extract). "ABV" abbreviation is NOT acceptable — must spell out "alcohol by volume" (27 CFR 7.63, 7.65)', cls: 'conditional' },
+      { text: 'Country of origin for imports (CBP / 27 CFR 7.69)', cls: 'conditional' },
+      { text: 'FD&C Yellow No. 5, cochineal extract or carmine, sulfites, or aspartame — if present (27 CFR 7.63(b))', cls: 'conditional' },
+    ]
+  },
+  wine: {
+    title: 'Wine · 27 CFR Part 4',
+    link: 'https://www.ttb.gov/regulated-commodities/beverage-alcohol/wine/anatomy-of-a-label',
+    linkLabel: 'Anatomy of a Wine Label — TTB Interactive Tool ↗',
+    note: 'Applies to wines with ≥7% alcohol by volume. The brand label must carry brand name, class/type, and appellation of origin (when required). "ABV" is NOT an acceptable abbreviation — must use "alcohol by volume" or "alc. by vol." in mandatory statements.',
+    items: [
+      { text: 'Brand name — must appear on the brand label; class/type designation alone cannot serve as brand name (27 CFR 4.33)', cls: 'mandatory' },
+      { text: 'Class and type designation — e.g., "Table Wine", "Sparkling Wine", "Chardonnay" — must appear on brand label (27 CFR 4.34). A color alone (e.g., "Rosé") is NOT a class/type.', cls: 'mandatory' },
+      { text: 'Name and address of bottler, packer, or importer — city and state required; must match basic permit exactly (27 CFR 4.35–4.37)', cls: 'mandatory' },
+      { text: 'Net contents — approved standard of fill required; may be blown into bottle (27 CFR 4.37(b))', cls: 'mandatory' },
+      { text: 'Alcohol content — MANDATORY for wines >14% ABV. Optional for 7–14% ABV if "table wine" or "light wine" appears as class/type. "ABV" abbreviation NOT acceptable (27 CFR 4.36)', cls: 'mandatory' },
+      { text: 'Government Health Warning Statement (27 CFR Part 16)', cls: 'mandatory' },
+      { text: 'Appellation of origin — MANDATORY when: (a) a grape variety is used as class/type, (b) a vintage date appears, or (c) a geographic area is implied. Must appear on brand label with class/type (27 CFR 4.25)', cls: 'conditional' },
+      { text: 'Grape variety — if used as class/type, ≥75% of wine must be from that variety (85% for state/county appellations), and appellation of origin is required (27 CFR 4.23)', cls: 'conditional' },
+      { text: 'Sulfite declaration ("Contains sulfites") — required if sulfites ≥10 ppm measured as total SO₂ (27 CFR 4.32(e))', cls: 'conditional' },
+      { text: 'Vintage date — optional; if shown, appellation of origin is required on brand label. Not permitted on imports in containers >5 liters (27 CFR 4.27)', cls: 'conditional' },
+      { text: 'Country of origin for imports (CBP regulations)', cls: 'conditional' },
+    ]
+  }
+};
+
+function setBevType(type, btn) {
+  currentBevType = type;
+  document.querySelectorAll('.bev-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateReqBanner(type);
+  // Update placeholder hints
+  const hints = {
+    spirits: { fClass: 'Kentucky Straight Bourbon Whiskey', fABV: '45% Alc./Vol. (90 Proof)' },
+    malt:    { fClass: 'American-Style Lager Beer', fABV: '5.0% alcohol by volume (conditional — see rules)' },
+    wine:    { fClass: 'Table Wine  (e.g., "Chardonnay", "Sparkling Wine", "Rosé Wine")', fABV: '13.5% alc. by vol.  (mandatory if >14%; see rules for 7–14%)' }
+  };
+  const h = hints[type] || hints.spirits;
+  if ($('fClass')) $('fClass').placeholder = h.fClass;
+  if ($('fABV')) $('fABV').placeholder = h.fABV;
+}
+
+function updateReqBanner(type) {
+  const req = BEV_REQS[type];
+  if (!req) return;
+  $('reqTitle').textContent = req.title;
+  $('reqLink').href = req.link;
+  $('reqLink').textContent = req.linkLabel || 'View full CFR requirements ↗';
+  const noteHtml = req.note ? `<div style="font-size:12px;color:var(--amber);background:var(--amber-bg);border-bottom:1px solid var(--border);padding:7px 12px;line-height:1.6;">${req.note}</div>` : '';
+  $('reqItems').innerHTML = noteHtml + req.items.map(item =>
+    `<div class="req-item ${item.cls}">${item.text}</div>`
+  ).join('') + '<div class="req-legend"><span class="req-legend-item m">Mandatory</span><span class="req-legend-item c">Conditional</span></div>';
+}
+
+// Init banner on load
+updateReqBanner('spirits');
+
+// ── Navigation
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  $('page-'+name).classList.add('active');
+  btn.classList.add('active');
+  if (name==='feedback') renderFeedbackLog();
+}
+
+// ── Image upload
+$('dropZone').addEventListener('click', ()=>$('fileInput').click());
+$('dropZone').addEventListener('dragover', e=>{e.preventDefault();$('dropZone').classList.add('over');});
+$('dropZone').addEventListener('dragleave', ()=>$('dropZone').classList.remove('over'));
+$('dropZone').addEventListener('drop', e=>{e.preventDefault();$('dropZone').classList.remove('over');loadImage(e.dataTransfer.files[0]);});
+$('fileInput').addEventListener('change', e=>{if(e.target.files[0])loadImage(e.target.files[0]);});
+$('changeBtn').addEventListener('click', ()=>{$('fileInput').value='';$('fileInput').click();});
+
+function loadImage(file) {
+  if(!file||!file.type.startsWith('image/')) return;
+  if(file.size>5*1024*1024){alert('Image must be under 5 MB.');return;}
+  imageType=file.type;
+  const r=new FileReader();
+  r.onload=e=>{imageData=e.target.result.split(',')[1];$('previewImg').src=e.target.result;$('dropZone').style.display='none';$('previewWrap').style.display='block';$('verifyBtn').disabled=false;};
+  r.readAsDataURL(file);
+}
+
+// ── Batch
+$('batchPickBtn').addEventListener('click',()=>$('batchInput').click());
+$('batchInput').addEventListener('change',e=>{batchFiles=Array.from(e.target.files);renderBatchList();});
+
+function renderBatchList(){
+  const el=$('batchList');
+  if(!batchFiles.length){el.innerHTML='<p class="empty" style="padding:14px;">Queue multiple labels for a single run.</p>';$('batchRunBar').style.display='none';return;}
+  el.innerHTML='<div style="padding:0 0 4px;">'+batchFiles.map((f,i)=>`<div class="batch-row" style="padding:5px 14px;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" id="bstat-${i}"><circle cx="8" cy="8" r="6" stroke="var(--text-3)" stroke-width="1.5"/></svg><span>${esc(f.name)}</span></div>`).join('')+'</div>';
+  $('batchRunBar').style.display='flex';
+}
+
+$('batchRunBtn').addEventListener('click', runBatch);
+async function runBatch(){
+  const apiKey=getKey();
+  if(!apiKey) return;
+  const fields=getFields();
+  $('batchRunBtn').disabled=true; $('batchSpin').style.display='inline-block';
+  const rows=[['File','Overall','Summary','Brand','Class/Type','ABV','Net Contents','Producer','Origin','Govt Warning']];
+  for(let i=0;i<batchFiles.length;i++){
+    $('batchProgress').textContent=`${i+1} / ${batchFiles.length}`;
+    setBatchIcon(i,'spin');
+    try{
+      const {b64,mime}=await f2b64(batchFiles[i]);
+      const result=await callAPI(apiKey,b64,mime,fields);
+      setBatchIcon(i,result.overall);
+      rows.push([batchFiles[i].name,result.overall,result.summary,...(result.checks||[]).map(c=>`${c.status}: ${c.note||'ok'}`)]);
+      addHistory(batchFiles[i].name,result);
+      await dispatchIntegrations(result,batchFiles[i].name);
+    }catch(e){setBatchIcon(i,'fail');rows.push([batchFiles[i].name,'error',e.message]);}
+  }
+  $('batchProgress').textContent='Done';$('batchRunBtn').disabled=false;$('batchSpin').style.display='none';
+  dl(`batch-${ds()}.csv`,rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');
+}
+
+const ICONS={
+  spin:`<circle cx="8" cy="8" r="6" stroke="var(--text-3)" stroke-width="1.5" fill="none"/>`,
+  pass:`<circle cx="8" cy="8" r="6" fill="var(--green-bg)"/><path d="M5 8l2 2 4-4" stroke="var(--green)" stroke-width="1.5" stroke-linecap="round" fill="none"/>`,
+  fail:`<circle cx="8" cy="8" r="6" fill="var(--red-bg)"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="var(--red)" stroke-width="1.5" stroke-linecap="round"/>`,
+  warn:`<circle cx="8" cy="8" r="6" fill="var(--amber-bg)"/><path d="M8 5v3M8 10.5v.5" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round"/>`,
+};
+function setBatchIcon(i,s){const el=$('bstat-'+i);if(el)el.innerHTML=ICONS[s]||ICONS.spin;}
+function f2b64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res({b64:e.target.result.split(',')[1],mime:file.type});r.onerror=()=>rej(new Error('Read failed'));r.readAsDataURL(file);});}
+
+// ── Single verify
+$('verifyBtn').addEventListener('click', runSingleVerify);
+$('demoBtn').addEventListener('click', loadDemo);
+$('clearBtn').addEventListener('click', clearForm);
+
+async function runSingleVerify(){
+  const apiKey=getKey();
+  if(!apiKey) return;
+  if(!imageData){alert('Upload a label image first.');return;}
+  setLoading(true); showSkeleton(); agentOverrides={};
+  try{
+    const result=await callAPI(apiKey,imageData,imageType,getFields());
+    lastResult=result; renderResult(result);
+    addHistory(getFields().brand||'Label',result);
+    await dispatchIntegrations(result,getFields().brand||'Label');
+  }catch(e){renderError(e.message);}
+  finally{setLoading(false);}
+}
+
+async function callAPI(apiKey,b64,mime,fields){
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-calls':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1800,system:buildSystemPrompt(currentBevType),messages:[{role:'user',content:[
+      {type:'image',source:{type:'base64',media_type:mime,data:b64}},
+      {type:'text',text:`Verify this label (beverage type: ${currentBevType}):\nBrand: ${fields.brand||'(not provided)'}\nClass/type: ${fields.classType||'(not provided)'}\nABV: ${fields.abv||'(not provided)'}\nNet contents: ${fields.net||'(not provided)'}\nProducer: ${fields.producer||'(not provided)'}\nOrigin: ${fields.origin||'domestic assumed'}\nNotes: ${fields.notes||'none'}\nApply the type-specific requirements and check government warning verbatim. Return only JSON.`}
+    ]}]})
+  });
+  if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error?.message||`API error ${resp.status}`);}
+  const data=await resp.json();
+  try{return JSON.parse((data.content?.[0]?.text||'').replace(/```json|```/g,'').trim());}
+  catch(e){throw new Error('Unexpected model response — try again.');}
+}
+
+// ── Render
+function showSkeleton(){
+  $('resultCard').style.display='block';
+  $('verdictPill').className='verdict-pill pending';$('verdictPill').textContent='Checking…';
+  $('verdictSummary').textContent='';$('resultTimestamp').textContent='';
+  $('exportBar').style.display='none';$('agentOverrideSection').style.display='none';$('jsonSection').style.display='none';
+  $('resultBody').innerHTML=[65,80,50,70,45].map(w=>`<div class="skel-row" style="width:${w}%;"></div>`).join('');
+}
+
+function renderResult(result){
+  const VL={pass:'APPROVED',fail:'REJECTED',warn:'REVIEW NEEDED'};
+  $('verdictPill').className='verdict-pill '+(result.overall||'warn');
+  $('verdictPill').textContent=VL[result.overall]||result.overall?.toUpperCase()||'—';
+  $('verdictSummary').textContent=result.summary||'';
+  const bevLabels={spirits:'Distilled Spirits',malt:'Malt Beverage',wine:'Wine'}; $('resultTimestamp').textContent=(bevLabels[currentBevType]||'')+' · '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const checks=result.checks||[];
+  $('resultBody').innerHTML=`<table class="check-table"><thead><tr><th style="width:85px;">Status</th><th style="width:150px;">Field</th><th>Details</th></tr></thead><tbody>${checks.map(renderRow).join('')}</tbody></table>`;
+  // JSON
+  $('jsonBox').textContent=JSON.stringify(buildPayload(result,getFields().brand||'Label',[]),null,2);
+  $('jsonSection').style.display='block';
+  // Agent override
+  $('feedbackRows').innerHTML=checks.map(c=>`<div class="feedback-row"><span class="feedback-field">${esc(c.label)}</span><span class="feedback-ai"><span class="status-dot ${c.status}">${slabel(c.status)}</span></span><span class="feedback-override"><button class="override-btn" onclick="setOvr('${c.field}','pass',this)" title="Pass">✓ Pass</button><button class="override-btn" onclick="setOvr('${c.field}','warn',this)" title="Warn">~ Warn</button><button class="override-btn" onclick="setOvr('${c.field}','fail',this)" title="Fail">✗ Fail</button><input class="feedback-note-input" id="fnote-${c.field}" placeholder="Add note…"/></span></div>`).join('');
+  $('agentOverrideSection').style.display='block';
+  // webhook btn
+  const cfg=loadCfg();
+  $('manualWebhookBtn').style.display=(cfg.webhook?.enabled&&cfg.webhook?.url)?'inline-flex':'none';
+  $('exportBar').style.display='flex';
+}
+
+function renderRow(c){
+  let d='';
+  const f=c.found||'',e=c.expected||'';
+  if(c.note) d+=`<div class="field-note">${esc(c.note)}</div>`;
+  if(f&&e&&f.toLowerCase()!==e.toLowerCase()){
+    if(c.field==='govt_warning'&&c.status==='fail') d+=`<div class="warning-compare"><strong>Found:</strong> ${esc(f)}</div>`;
+    else d+=`<div class="field-found">Found: <span class="diff-old">${esc(f)}</span> → Expected: <span class="diff-new">${esc(e)}</span></div>`;
+  }else if(f&&c.status!=='pass') d+=`<div class="field-found">On label: ${esc(f)}</div>`;
+  return `<tr><td><span class="status-dot ${c.status||'skip'}">${slabel(c.status)}</span></td><td style="color:var(--text-2);font-size:12px;">${esc(c.label)}</td><td>${d}</td></tr>`;
+}
+function slabel(s){return{pass:'Pass',fail:'Fail',warn:'Warning',skip:'Skip'}[s]||s||'—';}
+function renderError(msg){$('resultCard').style.display='block';$('verdictPill').className='verdict-pill fail';$('verdictPill').textContent='ERROR';$('verdictSummary').textContent=msg;$('resultBody').innerHTML=`<div class="empty" style="color:var(--red);">${esc(msg)}</div>`;$('exportBar').style.display='none';$('agentOverrideSection').style.display='none';$('jsonSection').style.display='none';}
+
+// ── Agent overrides
+function setOvr(field,status,btn){
+  if(!agentOverrides[field])agentOverrides[field]={};
+  agentOverrides[field].status=status;
+  btn.closest('.feedback-override').querySelectorAll('.override-btn').forEach(b=>{b.className='override-btn';});
+  btn.classList.add('sel-'+status);
+}
+$('saveFeedbackBtn').addEventListener('click',()=>{
+  if(!lastResult)return;
+  const entries=[];
+  (lastResult.checks||[]).forEach(c=>{
+    const ov=agentOverrides[c.field];
+    const note=($('fnote-'+c.field)?.value||'').trim();
+    if(ov||note){entries.push({timestamp:new Date().toISOString(),label:getFields().brand||'Unknown',field:c.field,field_label:c.label,ai_verdict:c.status,agent_verdict:ov?.status||c.status,changed:ov?ov.status!==c.status:false,agent_note:note,ai_note:c.note||'',found:c.found||'',expected:c.expected||''});}
+  });
+  if(!entries.length){toast('No overrides to save.');return;}
+  feedbackLog.push(...entries);
+  try{localStorage.setItem('ttb_fb',JSON.stringify(feedbackLog.slice(-500)));}catch(e){}
+  $('feedbackSaved').style.display='inline';
+  setTimeout(()=>$('feedbackSaved').style.display='none',3000);
+  toast(`${entries.length} correction${entries.length>1?'s':''} saved.`);
+  const cfg=loadCfg();
+  if(cfg.webhook?.enabled&&cfg.webhook?.url) sendWebhook(cfg.webhook,{type:'agent_feedback',entries,timestamp:new Date().toISOString()}).catch(()=>{});
+});
+
+// ── JSON copy
+$('copyJsonBtn').addEventListener('click',()=>navigator.clipboard.writeText($('jsonBox').textContent).then(()=>toast('JSON copied.')));
+
+// ── Manual webhook
+$('manualWebhookBtn').addEventListener('click',async()=>{
+  if(!lastResult)return;
+  const cfg=loadCfg();
+  try{await sendWebhook(cfg.webhook,buildPayload(lastResult,getFields().brand||'Label',[]));toast('Result sent to webhook.');}
+  catch(e){toast('Webhook failed: '+e.message);}
+});
+
+// ── Integration config
+function loadCfg(){try{return JSON.parse(localStorage.getItem('ttb_int')||'{}');}catch(e){return{};}}
+function saveCfg(cfg){localStorage.setItem('ttb_int',JSON.stringify(cfg));}
+
+(function initInt(){
+  const cfg=loadCfg();
+  if(cfg.webhook){$('webhookEnabled').checked=!!cfg.webhook.enabled;$('webhookUrl').value=cfg.webhook.url||'';$('webhookSecret').value=cfg.webhook.secret||'';$('webhookTrigger').value=cfg.webhook.trigger||'all';updStatus('webhookStatus',cfg.webhook.url&&cfg.webhook.enabled);}
+  if(cfg.teams){$('teamsEnabled').checked=!!cfg.teams.enabled;$('teamsUrl').value=cfg.teams.url||'';$('teamsChannel').value=cfg.teams.channel||'';$('teamsTrigger').value=cfg.teams.trigger||'fail';updStatus('teamsStatus',cfg.teams.url&&cfg.teams.enabled);}
+  if(cfg.email){$('emailEnabled').checked=!!cfg.email.enabled;$('emailUrl').value=cfg.email.url||'';$('emailTo').value=cfg.email.to||'';$('emailTrigger').value=cfg.email.trigger||'fail';updStatus('emailStatus',cfg.email.url&&cfg.email.enabled);}
+})();
+
+function updStatus(id,active){const el=$(id);el.textContent=active?'Configured':'Not configured';el.className='int-status '+(active?'on':'off');}
+function saveWebhook(){const cfg=loadCfg();cfg.webhook={enabled:$('webhookEnabled').checked,url:$('webhookUrl').value.trim(),secret:$('webhookSecret').value.trim(),trigger:$('webhookTrigger').value};saveCfg(cfg);updStatus('webhookStatus',cfg.webhook.url&&cfg.webhook.enabled);toast('Webhook saved.');}
+function saveTeams(){const cfg=loadCfg();cfg.teams={enabled:$('teamsEnabled').checked,url:$('teamsUrl').value.trim(),channel:$('teamsChannel').value.trim(),trigger:$('teamsTrigger').value};saveCfg(cfg);updStatus('teamsStatus',cfg.teams.url&&cfg.teams.enabled);toast('Teams config saved.');}
+function saveEmail(){const cfg=loadCfg();cfg.email={enabled:$('emailEnabled').checked,url:$('emailUrl').value.trim(),to:$('emailTo').value.trim(),trigger:$('emailTrigger').value};saveCfg(cfg);updStatus('emailStatus',cfg.email.url&&cfg.email.enabled);toast('Email config saved.');}
+
+async function testWebhook(){const url=$('webhookUrl').value.trim();if(!url){showTR('webhookTestResult','err','Enter a URL first.');return;}try{await sendWebhook({url,secret:$('webhookSecret').value.trim()},buildTestPayload());showTR('webhookTestResult','ok','Connection successful — test payload delivered.');}catch(e){showTR('webhookTestResult','err','Failed: '+e.message);}}
+async function testTeams(){const url=$('teamsUrl').value.trim();if(!url){showTR('teamsTestResult','err','Enter a Teams webhook URL first.');return;}try{await sendTeams({url,channel:$('teamsChannel').value.trim()},{overall:'pass',summary:'Test card from TTB Label Verifier.',label:'Test',checks:[]});showTR('teamsTestResult','ok','Test Adaptive Card sent to Teams.');}catch(e){showTR('teamsTestResult','err','Failed: '+e.message);}}
+async function testEmail(){const url=$('emailUrl').value.trim();if(!url){showTR('emailTestResult','err','Enter a webhook URL first.');return;}try{await sendWebhook({url},{type:'email_test',to:$('emailTo').value.trim(),subject:'TTB Label Verifier test',body:'Test message from TTB Label Verifier.',timestamp:new Date().toISOString()});showTR('emailTestResult','ok','Test payload sent.');}catch(e){showTR('emailTestResult','err','Failed: '+e.message);}}
+function showTR(id,type,msg){const el=$(id);el.style.display='block';el.className='test-result '+type;el.textContent=msg;setTimeout(()=>el.style.display='none',6000);}
+
+// ── Dispatch integrations
+async function dispatchIntegrations(result,label){
+  const cfg=loadCfg();
+  const payload=buildPayload(result,label,[]);
+  const promises=[];
+  if(cfg.webhook?.enabled&&cfg.webhook?.url&&shouldFire(cfg.webhook.trigger,result.overall)) promises.push(sendWebhook(cfg.webhook,payload).catch(e=>console.warn('Webhook:',e)));
+  if(cfg.teams?.enabled&&cfg.teams?.url&&shouldFire(cfg.teams.trigger,result.overall)) promises.push(sendTeams(cfg.teams,{...result,label}).catch(e=>console.warn('Teams:',e)));
+  if(cfg.email?.enabled&&cfg.email?.url&&shouldFire(cfg.email.trigger,result.overall)) promises.push(sendWebhook(cfg.email,{type:'email',to:cfg.email.to,subject:`TTB Verification: ${result.overall.toUpperCase()} — ${label}`,body:buildEmailBody(result,label),payload}).catch(e=>console.warn('Email:',e)));
+  if(promises.length){await Promise.allSettled(promises);toast(`Dispatched to ${promises.length} integration${promises.length>1?'s':''}`);}
+}
+
+function shouldFire(trigger,overall){if(trigger==='all')return true;if(trigger==='fail')return overall==='fail';if(trigger==='warn_fail')return overall==='fail'||overall==='warn';return true;}
+async function sendWebhook(cfg,payload){const h={'Content-Type':'application/json'};if(cfg.secret)h['X-TTB-Secret']=cfg.secret;const r=await fetch(cfg.url,{method:'POST',headers:h,body:JSON.stringify(payload)});if(!r.ok)throw new Error(`HTTP ${r.status}`);}
+async function sendTeams(cfg,result){const TC={pass:'1a6b3c',fail:'b53a2a',warn:'e0a84a'};const EM={pass:'\u2705',fail:'\u274c',warn:'\u26a0\ufe0f'};const facts=[{name:'Label',value:result.label||'Unknown'},{name:'Verdict',value:(result.overall||'').toUpperCase()},{name:'Summary',value:result.summary||''},{name:'Time',value:new Date().toLocaleString()}];const rows=(result.checks||[]).filter(c=>c.status!=='pass').map(c=>`- **${c.label}**: ${c.status.toUpperCase()}${c.note?' — '+c.note:''}`).join('\n')||'All checks passed.';const body={'@type':'MessageCard','@context':'http://schema.org/extensions','themeColor':TC[result.overall]||'888888','summary':`TTB Label Verification: ${(result.overall||'').toUpperCase()}`,'sections':[{'activityTitle':`${EM[result.overall]||'\ud83d\udccb'} **TTB Label Verification: ${(result.overall||'').toUpperCase()}**`,'activitySubtitle':cfg.channel?`Channel: ${cfg.channel}`:'TTB Label Verifier','facts':facts,'markdown':true},{'title':'Check details','text':rows}]};await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}
+function buildPayload(result,label,fb){return{id:`verify_${Date.now()}`,timestamp:new Date().toISOString(),label,overall:result.overall,summary:result.summary,checks:result.checks||[],agent_feedback:fb};}
+function buildTestPayload(){return{id:`verify_test_${Date.now()}`,timestamp:new Date().toISOString(),label:'Test',overall:'pass',summary:'Test payload from TTB Label Verifier.',checks:[],agent_feedback:[]};}
+function buildEmailBody(result,label){const VL={pass:'APPROVED',fail:'REJECTED',warn:'REVIEW NEEDED'};const lines=[`TTB Label Verification: ${VL[result.overall]||result.overall}`,`Label: ${label}`,`Summary: ${result.summary}`,``];(result.checks||[]).forEach(c=>{lines.push(`${c.label}: ${c.status.toUpperCase()}${c.note?' — '+c.note:''}`);});lines.push(``,`Generated: ${new Date().toLocaleString()}`);return lines.join('\n');}
+
+// ── Export
+$('exportCSVBtn').addEventListener('click',()=>{if(!lastResult)return;const rows=[['Field','Status','Found on label','Expected','Note']];(lastResult.checks||[]).forEach(c=>rows.push([c.label,c.status,c.found||'',c.expected||'',c.note||'']));dl(`ttb-result-${ds()}.csv`,rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');});
+$('exportHTMLBtn').addEventListener('click',()=>{
+  if(!lastResult)return;
+  const r=lastResult,VC={pass:'#1a6b3c',fail:'#b53a2a',warn:'#8a5d0a'},VL={pass:'APPROVED',fail:'REJECTED',warn:'REVIEW NEEDED'};
+  const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>TTB Label Verification Report</title><style>body{font-family:system-ui,sans-serif;max-width:760px;margin:40px auto;padding:0 24px;color:#1a1917;font-size:14px;line-height:1.6}h1{font-size:20px;margin-bottom:4px}.meta{color:#777;font-size:12px;margin-bottom:24px}.verdict{display:inline-block;padding:6px 16px;border-radius:100px;font-size:13px;font-weight:600;color:${VC[r.overall]||'#555'};background:${VC[r.overall]||'#555'}18;margin-bottom:8px}.summary{color:#444;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-bottom:32px}th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#888;padding:8px 12px;border-bottom:2px solid #e5e5e5}td{padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;vertical-align:top}.pass{color:#1a6b3c;font-weight:500}.fail{color:#b53a2a;font-weight:500}.warn{color:#8a5d0a;font-weight:500}.skip{color:#aaa}footer{font-size:11px;color:#bbb;margin-top:40px;padding-top:16px;border-top:1px solid #eee}</style></head><body><h1>TTB Label Verification Report</h1><p class="meta">Generated ${new Date().toLocaleString()} · TTB Label Verifier prototype</p><div class="verdict">${VL[r.overall]||r.overall?.toUpperCase()}</div><p class="summary">${esc(r.summary)}</p><table><thead><tr><th>Field</th><th>Status</th><th>Found on label</th><th>Note</th></tr></thead><tbody>${(r.checks||[]).map(c=>`<tr><td>${esc(c.label)}</td><td class="${c.status}">${slabel(c.status)}</td><td>${esc(c.found||'—')}</td><td>${esc(c.note||'')}</td></tr>`).join('')}</tbody></table><footer>TTB Label Verifier · COLA Compliance Prototype · Not an official TTB determination</footer></body></html>`;
+  dl(`ttb-report-${ds()}.html`,html,'text/html');
+});
+
+// ── Feedback log
+$('exportFeedbackBtn').addEventListener('click',()=>{
+  if(!feedbackLog.length){toast('No feedback to export.');return;}
+  const rows=[['Timestamp','Label','Field','AI verdict','Agent verdict','Changed','Agent note','AI note','Found','Expected']];
+  feedbackLog.forEach(e=>rows.push([e.timestamp,e.label,e.field_label||e.field,e.ai_verdict,e.agent_verdict,e.changed?'yes':'no',e.agent_note||'',e.ai_note||'',e.found||'',e.expected||'']));
+  dl(`feedback-${ds()}.csv`,rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');
+});
+$('clearFeedbackBtn').addEventListener('click',()=>{if(!confirm('Clear all feedback? Cannot be undone.'))return;feedbackLog=[];try{localStorage.removeItem('ttb_fb');}catch(e){}renderFeedbackLog();toast('Feedback log cleared.');});
+function renderFeedbackLog(){
+  const el=$('feedbackLogBody');
+  $('feedbackCount').textContent=feedbackLog.length?`${feedbackLog.length} correction${feedbackLog.length>1?'s':''} recorded`:'';
+  if(!feedbackLog.length){el.innerHTML='<p class="empty">No corrections recorded yet.</p>';return;}
+  el.innerHTML=`<table class="log-table"><thead><tr><th>Time</th><th>Label</th><th>Field</th><th>AI</th><th>Agent</th><th>Note</th></tr></thead><tbody>${feedbackLog.slice().reverse().map(e=>`<tr><td style="color:var(--text-3);white-space:nowrap;">${new Date(e.timestamp).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.label)}</td><td style="color:var(--text-2);">${esc(e.field_label||e.field)}</td><td><span class="status-dot ${e.ai_verdict}">${slabel(e.ai_verdict)}</span></td><td><span class="status-dot ${e.agent_verdict}">${slabel(e.agent_verdict)}</span><span class="correction-badge ${e.changed?'cb-changed':'cb-confirmed'}">${e.changed?'changed':'confirmed'}</span></td><td style="color:var(--text-2);font-size:12px;">${esc(e.agent_note||'')}</td></tr>`).join('')}</tbody></table>`;
+}
+
+// ── History
+function addHistory(name,result){
+  sessionHistory.unshift({name,overall:result.overall,summary:result.summary,time:new Date()});
+  if(sessionHistory.length>10)sessionHistory.pop();
+  $('historyCard').style.display='block';
+  $('historyBody').innerHTML=sessionHistory.map(h=>`<div class="history-row"><svg width="16" height="16" viewBox="0 0 16 16" fill="none">${ICONS[h.overall]||''}</svg><span class="history-name" title="${esc(h.summary)}">${esc(h.name)}</span><span class="history-time">${h.time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span></div>`).join('');
+}
+
+// ── Utils
+function getFields(){return{brand:$('fBrand').value.trim(),classType:$('fClass').value.trim(),abv:$('fABV').value.trim(),net:$('fNet').value.trim(),producer:$('fProducer').value.trim(),origin:$('fOrigin').value.trim(),notes:$('fNotes').value.trim(),bevType:currentBevType};}
+function setLoading(on){$('verifyBtn').disabled=on||!imageData;$('verifySpin').style.display=on?'inline-block':'none';}
+function loadDemo(){$('fBrand').value='OLD TOM DISTILLERY';$('fClass').value='Kentucky Straight Bourbon Whiskey';$('fABV').value='45% Alc./Vol. (90 Proof)';$('fNet').value='750 mL';$('fProducer').value='Old Tom Distillery LLC, Louisville, KY 40202';$('fOrigin').value='';$('fNotes').value='';}
+function clearForm(){['fBrand','fClass','fABV','fNet','fProducer','fOrigin','fNotes'].forEach(id=>$(id).value='');imageData=null;imageType=null;lastResult=null;agentOverrides={};$('previewWrap').style.display='none';$('dropZone').style.display='flex';$('verifyBtn').disabled=true;$('resultCard').style.display='none';$('fileInput').value='';}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function ds(){return new Date().toISOString().slice(0,16).replace(/[T:]/g,'-');}
+function dl(name,content,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();}
+function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2500);}
+</script>
+</body>
+</html>
