@@ -2,21 +2,21 @@
 
 **AI-powered COLA label compliance review for alcohol beverage producers, importers, and TTB compliance teams.**
 
-The TTB (Alcohol and Tobacco Tax and Trade Bureau) reviews approximately 150,000 Certificate of Label Approval (COLA) applications each year. Each review requires an agent to manually examine a physical label image and verify that every required element — brand name, class designation, alcohol content, government warning statement, and more — matches what was submitted in the application, and meets the specific formatting and placement requirements set out in 27 CFR.
+The TTB (Alcohol and Tobacco Tax and Trade Bureau) reviews approximately 150,000 Certificate of Label Approval (COLA) applications each year. Each review requires an agent to manually examine a physical label image and verify that every required element such as brand name, class designation, alcohol content, government warning statement, and more matches what was submitted in the application, and meets the specific formatting and placement requirements set out in 27 CFR.
 
-This tool uses Claude Vision (Anthropic's multimodal AI) to read a label image the same way a trained agent would, then cross-references every field against the application data in seconds. The result is a structured, per-field compliance report with specific CFR citations behind each finding.
+This tool uses Claude Vision (Anthropic's multimodal AI) to read a label image the same way a trained agent would, then cross-references every field against the application data in seconds. The result is a structured, per-field compliance report with specific CFR citations behind each finding. Claude is a widely recognizable and vetted application that can be deployed securely, governed, and accessed easily by governemnt organizations. 
 
 ---
 
 ## Who this is for
 
-**TTB compliance agents** — use this to pre-screen label submissions before formal review, reducing time spent on routine matching tasks and focusing attention on edge cases and judgment calls.
+**TTB compliance agents** use this to pre-screen label submissions before formal review, reducing time spent on routine matching tasks and focusing attention on edge cases and judgment calls.
 
-**Alcohol beverage producers and importers** — use this before submitting a COLA application to catch formatting errors, missing elements, and government warning violations that would result in rejection.
+**Alcohol beverage producers and importers** use this before submitting a COLA application to catch formatting errors, missing elements, and government warning violations that would result in rejection.
 
-**Compliance consultants and label designers** — use this as a checklist tool when preparing labels for multiple SKUs or clients across different beverage categories.
+**Compliance consultants and label designers** use this as a checklist tool when preparing labels for multiple SKUs or clients across different beverage categories.
 
-**Technology and innovation teams** — use this as a working prototype to demonstrate how AI-assisted document review can reduce processing backlogs and support federal compliance workflows.
+**Technology and innovation teams** use this as a working prototype to demonstrate how AI-assisted document review can reduce processing backlogs and support federal compliance workflows.
 
 ---
 
@@ -45,7 +45,7 @@ Each check returns one of four statuses:
 
 ## Beverage type rules
 
-The verification engine loads a different CFR rule set depending on the beverage type selected. This is not a generic check — each type has substantively different requirements.
+The verification engine loads a different CFR rule set depending on the beverage type selected. Not a generic check, each type has substantively different requirements.
 
 ### Distilled Spirits — 27 CFR Part 5
 
